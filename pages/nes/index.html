@@ -220,6 +220,8 @@ window.EJS_player='#game';window.EJS_gameUrl=romUrl;window.EJS_core=CORE;
 window.EJS_pathtodata='https://cdn.emulatorjs.org/stable/data/';
 window.EJS_defaultControls=RetroKeybinds.buildDefaultControls(CORE);
 window.EJS_onGameStart=function(){focusGame();RetroPad.syncEmulator()};
+// EmulatorJS waits for a "Start Game" click (needed for audio). Skip it once the visitor has interacted with the page; otherwise show it centered.
+window.EJS_alignStartButton='center';window.EJS_startOnLoaded=!navigator.userActivation||navigator.userActivation.hasBeenActive;
 var old=document.getElementById('ejs-script');if(old)old.remove();
 var sc=document.createElement('script');sc.id='ejs-script';sc.src='https://cdn.emulatorjs.org/stable/data/loader.js';document.body.appendChild(sc);
 var settings=loadSettings();if(settings.autoFullscreen)setTimeout(function(){toggleFullscreen()},1000);
@@ -232,7 +234,7 @@ var ex=document.exitFullscreen||document.webkitExitFullscreen;
 if(document.fullscreenElement||document.webkitFullscreenElement){if(ex)ex.call(document)}
 if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();
 document.getElementById('player-container').style.display='none';document.getElementById('game').innerHTML='';
-delete window.EJS_player;delete window.EJS_gameUrl;delete window.EJS_core;delete window.EJS_defaultControls;delete window.EJS_onGameStart;
+delete window.EJS_player;delete window.EJS_gameUrl;delete window.EJS_core;delete window.EJS_defaultControls;delete window.EJS_onGameStart;delete window.EJS_alignStartButton;delete window.EJS_startOnLoaded;
 clearTimeout(toolbarTimer);location.reload();
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('player-container').style.display==='block')closePlayer()});

@@ -113,6 +113,11 @@
     raf = requestAnimationFrame(tick);
 
     if (isPlaying()) {
+      // A or Start presses EmulatorJS's "Start Game" button when it is showing
+      var startBtn = document.querySelector("#game .ejs_start_button");
+      if (startBtn && startBtn.offsetParent !== null && list.some(function (g) {
+        return (g.buttons[BTN_A] && g.buttons[BTN_A].pressed) || (g.buttons[BTN_START] && g.buttons[BTN_START].pressed);
+      })) startBtn.click();
       var held = list.some(function (g) {
         return g.buttons[BTN_SELECT] && g.buttons[BTN_SELECT].pressed &&
                g.buttons[BTN_START] && g.buttons[BTN_START].pressed;

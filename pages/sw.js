@@ -1,4 +1,4 @@
-const CACHE_NAME = 'retro-games-v3';
+const CACHE_NAME = 'retro-games-v4';
 const ROM_CACHE_NAME = 'retro-roms-v2';
 const APP_SHELL = [
     '/',
@@ -6,7 +6,9 @@ const APP_SHELL = [
     '/nes/',
     '/nes/index.html',
     '/snes/',
-    '/snes/index.html'
+    '/snes/index.html',
+    '/keybinds.js',
+    '/controller.js'
 ];
 
 // Install: cache app shell

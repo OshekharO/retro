@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SNES Game Player</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -40,6 +40,13 @@ body{background:#1a1a2e;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,Verda
 .game-row .cache-btn:hover{border-color:#4ecca3;color:#4ecca3}
 .game-row .cache-btn.cached{border-color:#4ecca3;color:#4ecca3}
 .game-row .play-icon{color:#7b2ff7;font-size:1.2em;margin-left:10px}
+.pad-pill{display:inline-flex;align-items:center;height:40px;padding:0 12px;border:2px solid #0f3460;border-radius:20px;font-size:.8em;color:#888;white-space:nowrap}
+.pad-pill.on{border-color:#4ecca3;color:#4ecca3}
+.game-row.pad-selected{background:#1a2a4e;outline:2px solid #4ecca3;outline-offset:-2px}
+.pad-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:rgba(0,0,0,.9);color:#fff;padding:10px 18px;border-radius:20px;font-size:.9em;z-index:3000;opacity:0;pointer-events:none;transition:opacity .25s}
+.pad-toast.show{opacity:1}
+#game:focus{outline:none}
+@media(min-width:1100px){.container{max-width:1000px}.modal-box{max-width:620px}}
 .no-games{text-align:center;padding:40px;color:#888}
 #player-container{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000}
 .player-toolbar{position:fixed;top:0;left:0;right:0;z-index:1001;display:none;justify-content:flex-start;align-items:center;gap:8px;padding:8px 12px 8px 52px;background:rgba(0,0,0,.85);transition:opacity .3s}
@@ -92,6 +99,7 @@ footer .heart{color:#7b2ff7;font-size:1.1em}
 <h1>&#127923; SNES Game Player</h1>
 <p>Super Nintendo &bull; 16-bit &bull; 4 Buttons (A, B, X, Y) + L/R Shoulders</p>
 <div class="header-actions">
+<span class="pad-pill" id="pad-status" title="Connect a controller and press any button">&#127918; No controller</span>
 <a href="/" class="icon-btn" title="Back to Console Selection">&#8592;</a>
 <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
 </div>
@@ -133,6 +141,11 @@ footer .heart{color:#7b2ff7;font-size:1.1em}
 <div id="keybind-list"></div>
 <div style="margin-top:10px"><button class="btn btn-small btn-secondary" onclick="resetKeyBindings()">Reset to Defaults</button></div>
 <p style="color:#888;font-size:.78em;margin-top:10px">Note: if you've already remapped a specific game from the ⚙ icon inside the emulator, that per-game remap takes priority over these defaults for that game.</p>
+<h3>&#127918; Controller</h3>
+<p id="pad-list" style="color:#888;font-size:.8em;margin-bottom:10px">Checking...</p>
+<p style="color:#888;font-size:.8em;margin-bottom:10px">Works with Xbox, PlayStation, Switch Pro and most USB/Bluetooth pads. Press any button on the pad once so the browser detects it. In the game list: D-Pad/stick to move, A to play, LB/RB to page. While playing: hold Select + Start for 1.5s to exit. Click a button below, then press the controller button to assign.</p>
+<div id="padbind-list"></div>
+<div style="margin-top:10px"><button class="btn btn-small btn-secondary" onclick="resetPadBindings()">Reset Controller to Defaults</button></div>
 <h3>&#128268; Offline Play</h3>
 <div class="setting-row">
 <label>Service Worker Status<span class="setting-desc" id="sw-status">Checking...</span></label>
@@ -144,6 +157,7 @@ footer .heart{color:#7b2ff7;font-size:1.1em}
 </div>
 </div>
 <script src="/keybinds.js"></script>
+<script src="/controller.js"></script>
 <script>
 var CORE='snes', ROMS_PATH='/snes-roms/', SETTINGS_KEY='snesPlayerSettings';
 var DEFAULT_SETTINGS={autoFullscreen:false,forceLandscape:true};
@@ -151,20 +165,24 @@ function loadSettings(){try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(
 function saveSetting(k,v){var s=loadSettings();s[k]=v;localStorage.setItem(SETTINGS_KEY,JSON.stringify(s))}
 function applySettingsToUI(){var s=loadSettings();document.getElementById('setting-auto-fullscreen').checked=s.autoFullscreen;document.getElementById('setting-force-landscape').checked=s.forceLandscape}
 
-var stopKeyBindUI=null;
+var stopKeyBindUI=null,stopPadBindUI=null;
+function resetPadBindings(){RetroKeybinds.resetPadBinds(CORE);renderPadBindings()}
+function renderPadBindings(){if(stopPadBindUI)stopPadBindUI();stopPadBindUI=RetroKeybinds.renderPadBindUI(document.getElementById('padbind-list'),CORE)}
 function resetKeyBindings(){RetroKeybinds.resetKeyBinds(CORE);renderKeyBindings()}
 function renderKeyBindings(){if(stopKeyBindUI)stopKeyBindUI();stopKeyBindUI=RetroKeybinds.renderKeyBindUI(document.getElementById('keybind-list'),CORE)}
-function openSettings(){applySettingsToUI();renderKeyBindings();updateCachedCount();document.getElementById('settings-modal').classList.add('active')}
-function closeSettings(){document.getElementById('settings-modal').classList.remove('active');if(stopKeyBindUI){stopKeyBindUI();stopKeyBindUI=null}}
+function openSettings(){applySettingsToUI();renderKeyBindings();renderPadBindings();RetroPad.update();updateCachedCount();document.getElementById('settings-modal').classList.add('active')}
+function closeSettings(){document.getElementById('settings-modal').classList.remove('active');if(stopKeyBindUI){stopKeyBindUI();stopKeyBindUI=null}if(stopPadBindUI){stopPadBindUI();stopPadBindUI=null}}
 document.getElementById('settings-modal').addEventListener('click',function(e){if(e.target===this)closeSettings()});
 
-function toggleFullscreen(){var c=document.getElementById('player-container');if(!document.fullscreenElement&&!document.webkitFullscreenElement){var req=c.requestFullscreen||c.webkitRequestFullscreen;if(req)req.call(c).then(function(){var s=loadSettings();if(s.forceLandscape&&screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(function(){})}).catch(function(){})}else{var ex=document.exitFullscreen||document.webkitExitFullscreen;if(ex)ex.call(document);if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock()}}
+var IS_TOUCH=navigator.maxTouchPoints>0&&window.matchMedia&&matchMedia('(pointer:coarse)').matches;
+function toggleFullscreen(){var c=document.getElementById('player-container');if(!document.fullscreenElement&&!document.webkitFullscreenElement){var req=c.requestFullscreen||c.webkitRequestFullscreen;if(req)req.call(c).then(function(){var s=loadSettings();if(s.forceLandscape&&IS_TOUCH&&screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(function(){})}).catch(function(){})}else{var ex=document.exitFullscreen||document.webkitExitFullscreen;if(ex)ex.call(document);if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock()}}
 document.addEventListener('fullscreenchange',updateFSUI);document.addEventListener('webkitfullscreenchange',updateFSUI);
 function updateFSUI(){var fs=!!(document.fullscreenElement||document.webkitFullscreenElement);var btn=document.getElementById('fullscreen-btn');btn.innerHTML=fs?'&#10006; Exit FS':'&#x26F6; Fullscreen';btn.classList.toggle('active',fs)}
 
 var toolbarTimer=null;
 function toggleToolbar(){var tb=document.getElementById('player-toolbar');if(tb.classList.contains('visible')){tb.classList.remove('visible');clearTimeout(toolbarTimer)}else{tb.classList.add('visible');clearTimeout(toolbarTimer);toolbarTimer=setTimeout(function(){tb.classList.remove('visible')},5000)}}
 
+document.getElementById('player-container').addEventListener('mousemove',function(e){if(e.clientY<60){var tb=document.getElementById('player-toolbar');if(!tb.classList.contains('visible'))toggleToolbar();else{clearTimeout(toolbarTimer);toolbarTimer=setTimeout(function(){tb.classList.remove('visible')},3000)}}});
 var swReady=false,cachedRomUrls=new Set(),currentFilter='all';
 if('serviceWorker' in navigator){
 navigator.serviceWorker.register('/sw.js').then(function(){swReady=true;document.getElementById('sw-status').textContent='Active';requestCachedRomsList()}).catch(function(err){document.getElementById('sw-status').textContent='Failed: '+err.message});
@@ -201,16 +219,20 @@ p.style.display='block';g.innerHTML='';
 window.EJS_player='#game';window.EJS_gameUrl=romUrl;window.EJS_core=CORE;
 window.EJS_pathtodata='https://cdn.emulatorjs.org/stable/data/';
 window.EJS_defaultControls=RetroKeybinds.buildDefaultControls(CORE);
+window.EJS_onGameStart=function(){focusGame();RetroPad.syncEmulator()};
 var old=document.getElementById('ejs-script');if(old)old.remove();
 var sc=document.createElement('script');sc.id='ejs-script';sc.src='https://cdn.emulatorjs.org/stable/data/loader.js';document.body.appendChild(sc);
 var settings=loadSettings();if(settings.autoFullscreen)setTimeout(function(){toggleFullscreen()},1000);
 }
+function focusGame(){var g=document.getElementById('game');g.setAttribute('tabindex','-1');if(document.activeElement&&document.activeElement!==document.body)document.activeElement.blur();g.focus({preventScroll:true})}
+document.getElementById('player-toolbar').addEventListener('click',function(){setTimeout(focusGame,0)});
+document.getElementById('game').addEventListener('mousedown',function(){setTimeout(focusGame,0)});
 function closePlayer(){
 var ex=document.exitFullscreen||document.webkitExitFullscreen;
 if(document.fullscreenElement||document.webkitFullscreenElement){if(ex)ex.call(document)}
 if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();
 document.getElementById('player-container').style.display='none';document.getElementById('game').innerHTML='';
-delete window.EJS_player;delete window.EJS_gameUrl;delete window.EJS_core;delete window.EJS_defaultControls;
+delete window.EJS_player;delete window.EJS_gameUrl;delete window.EJS_core;delete window.EJS_defaultControls;delete window.EJS_onGameStart;
 clearTimeout(toolbarTimer);location.reload();
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('player-container').style.display==='block')closePlayer()});
